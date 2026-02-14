@@ -55,8 +55,14 @@ func main() {
 
 	// Create session tracker.
 	tracker := session.NewTracker(cfg.IdleThreshold, cfg.PollInterval, logger, func(s *session.CompletedSession) {
-		if err := pub.PublishCompleted(s, reg); err != nil {
-			logger.Error("failed to publish session completed", "error", err, "session_id", s.SessionID)
+		if s.ExitCode != 0 {
+			if err := pub.PublishFailed(s, reg); err != nil {
+				logger.Error("failed to publish session failed", "error", err, "session_id", s.SessionID)
+			}
+		} else {
+			if err := pub.PublishCompleted(s, reg); err != nil {
+				logger.Error("failed to publish session completed", "error", err, "session_id", s.SessionID)
+			}
 		}
 	})
 
@@ -93,6 +99,9 @@ func loadConfig(path string, logger *slog.Logger) Config {
 	if v := os.Getenv("CC_SIDECAR_NATS_URL"); v != "" {
 		cfg.NATS.URL = v
 	}
+	if v := os.Getenv("CC_SIDECAR_NATS_TOKEN"); v != "" {
+		cfg.NATS.Token = v
+	}
 	if v := os.Getenv("CC_SIDECAR_WATCH_DIR"); v != "" {
 		cfg.WatchDir = v
 	}
@@ -118,6 +127,9 @@ func loadConfig(path string, logger *slog.Logger) Config {
 	// Re-apply env overrides (highest precedence).
 	if v := os.Getenv("CC_SIDECAR_NATS_URL"); v != "" {
 		cfg.NATS.URL = v
+	}
+	if v := os.Getenv("CC_SIDECAR_NATS_TOKEN"); v != "" {
+		cfg.NATS.Token = v
 	}
 	if v := os.Getenv("CC_SIDECAR_WATCH_DIR"); v != "" {
 		cfg.WatchDir = v
