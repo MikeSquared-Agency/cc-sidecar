@@ -1,6 +1,7 @@
 package publisher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -30,8 +31,8 @@ type Event struct {
 // SessionData is the payload for cc.session.completed/failed events.
 type SessionData struct {
 	SessionID      string   `json:"session_id"`
-	TaskID         string   `json:"task_id"`
-	OwnerUUID      string   `json:"owner_uuid"`
+	TaskID         string   `json:"task_id,omitempty"`
+	OwnerUUID      string   `json:"owner_uuid,omitempty"`
 	AgentType      string   `json:"agent_type"`
 	TranscriptPath string   `json:"transcript_path"`
 	FilesChanged   []string `json:"files_changed"`
@@ -132,11 +133,15 @@ func (p *Publisher) publish(subject, eventType string, s *session.CompletedSessi
 		return fmt.Errorf("marshal event: %w", err)
 	}
 
-	if err := p.nc.Publish(subject, evBytes); err != nil {
-		return fmt.Errorf("publish: %w", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ack, err := p.js.Publish(ctx, subject, evBytes)
+	if err != nil {
+		return fmt.Errorf("jetstream publish: %w", err)
 	}
 
-	p.logger.Info("published session event", "subject", subject, "session_id", s.SessionID, "task_id", taskID)
+	p.logger.Info("published session event", "subject", subject, "session_id", s.SessionID, "task_id", taskID, "stream", ack.Stream, "seq", ack.Sequence)
 	return nil
 }
 

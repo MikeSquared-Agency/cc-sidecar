@@ -21,10 +21,15 @@ type CompletedSession struct {
 
 // trackedFile tracks a JSONL transcript file being written to.
 type trackedFile struct {
-	path      string
-	lastWrite time.Time
-	reported  bool
+	path       string
+	lastWrite  time.Time
+	reported   bool
+	reportedAt time.Time
 }
+
+// cleanupGrace is how long a reported file stays in the map before eviction.
+// This allows Touch() to reset the reported flag if the file is written again.
+const cleanupGrace = 5 * time.Minute
 
 // OnComplete is called when a session is detected as complete.
 type OnComplete func(s *CompletedSession)
@@ -101,6 +106,16 @@ func (t *Tracker) check() {
 	t.mu.Lock()
 	now := time.Now()
 	for path, tf := range t.files {
+		// Evict reported files after the grace period to prevent unbounded
+		// growth of the files map. The grace window allows Touch() to reset
+		// the reported flag if the file is written to again shortly after
+		// completion.
+		if tf.reported && !tf.reportedAt.IsZero() && now.Sub(tf.reportedAt) >= cleanupGrace {
+			t.logger.Debug("evicting completed transcript from tracker", "path", path)
+			delete(t.files, path)
+			continue
+		}
+
 		if tf.reported {
 			continue
 		}
@@ -117,6 +132,7 @@ func (t *Tracker) check() {
 
 		t.logger.Info("session idle, no claude process — completing", "path", path, "idle", idle)
 		tf.reported = true
+		tf.reportedAt = now
 		readyPaths = append(readyPaths, path)
 	}
 	t.mu.Unlock()
