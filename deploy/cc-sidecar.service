@@ -1,15 +1,14 @@
 [Unit]
 Description=CC Sidecar — Claude Code session watcher
-After=network.target nats-server.service
-Wants=nats-server.service
+After=network.target docker.service
+Requires=docker.service
 
 [Service]
 Type=simple
 User=mike
-ExecStart=/usr/local/bin/cc-sidecar
+ExecStart=/home/mike/cc-sidecar/bin/cc-sidecar --config /etc/cc-sidecar/config.yaml
 Restart=on-failure
 RestartSec=5
-Environment=CC_SIDECAR_NATS_URL=nats://localhost:4222
 
 [Install]
 WantedBy=multi-user.target

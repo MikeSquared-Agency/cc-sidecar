@@ -143,6 +143,6 @@ func (p *Publisher) publish(subject, eventType string, s *session.CompletedSessi
 // Close drains and closes the NATS connection.
 func (p *Publisher) Close() {
 	if p.nc != nil {
-		p.nc.Drain()
+		_ = p.nc.Drain()
 	}
 }
