@@ -145,7 +145,10 @@ func loadConfig(path string, logger *slog.Logger) Config {
 
 func expandHome(path string) string {
 	if strings.HasPrefix(path, "~/") {
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			slog.Warn("could not determine home directory, path may be malformed", "path", path, "error", err)
+		}
 		return filepath.Join(home, path[2:])
 	}
 	return path
