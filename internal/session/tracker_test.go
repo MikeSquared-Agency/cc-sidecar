@@ -2,6 +2,7 @@ package session
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 // newTestTracker creates a tracker with process check disabled (always returns false).
 func newTestTracker(idleThreshold, pollInterval time.Duration, onComplete OnComplete) *Tracker {
 	t := NewTracker(idleThreshold, pollInterval, testLogger(), onComplete)
-	t.processCheck = func() bool { return false } // no claude process in tests
+	t.processCheck = func(string) bool { return false } // no claude process in tests
 	return t
 }
 
@@ -137,7 +138,7 @@ func TestTrackerProcessRunningBlocksCompletion(t *testing.T) {
 		},
 	)
 	// Process is "always running" — should never trigger completion.
-	tracker.processCheck = func() bool { return true }
+	tracker.processCheck = func(string) bool { return true }
 
 	go tracker.Start()
 	defer tracker.Stop()
@@ -155,4 +156,56 @@ func TestTrackerProcessRunningBlocksCompletion(t *testing.T) {
 	if c != 0 {
 		t.Errorf("expected 0 completions while process running, got %d", c)
 	}
+}
+
+func TestProjectDirFromTranscript(t *testing.T) {
+	// Create a real directory to act as the "project dir" so that
+	// projectDirFromTranscript's os.Stat check passes.
+	realDir := t.TempDir()
+
+	// Build a slug from the real temp dir path: replace "/" with "-".
+	// e.g., "/tmp/TestXyz123" -> "-tmp-TestXyz123"
+	slug := pathToSlug(realDir)
+
+	// Build a fake transcript path:
+	// <somewhere>/projects/<slug>/session.jsonl
+	fakeBase := filepath.Join(t.TempDir(), "projects", slug)
+	os.MkdirAll(fakeBase, 0755)
+	transcriptPath := filepath.Join(fakeBase, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jsonl")
+
+	got := projectDirFromTranscript(transcriptPath)
+	if got != realDir {
+		t.Errorf("projectDirFromTranscript(%q) = %q, want %q", transcriptPath, got, realDir)
+	}
+}
+
+func TestProjectDirFromTranscript_NoProjectsParent(t *testing.T) {
+	// Path without "projects" parent directory should return "".
+	got := projectDirFromTranscript("/some/random/path/session.jsonl")
+	if got != "" {
+		t.Errorf("expected empty string for non-projects path, got %q", got)
+	}
+}
+
+func TestProjectDirFromTranscript_NonexistentDir(t *testing.T) {
+	// Slug that decodes to a non-existent directory.
+	transcriptPath := "/home/mike/.claude/projects/-nonexistent-path-that-does-not-exist/session.jsonl"
+	got := projectDirFromTranscript(transcriptPath)
+	if got != "" {
+		t.Errorf("expected empty string for non-existent decoded dir, got %q", got)
+	}
+}
+
+// pathToSlug converts an absolute path to a Claude project slug.
+// e.g., "/home/mike/Warren" -> "-home-mike-Warren"
+func pathToSlug(p string) string {
+	result := make([]byte, len(p))
+	for i, c := range []byte(p) {
+		if c == '/' {
+			result[i] = '-'
+		} else {
+			result[i] = c
+		}
+	}
+	return string(result)
 }

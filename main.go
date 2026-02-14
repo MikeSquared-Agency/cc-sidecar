@@ -95,36 +95,17 @@ func loadConfig(path string, logger *slog.Logger) Config {
 	}
 	cfg.NATS.URL = "nats://localhost:4222"
 
-	// Env overrides first (lowest precedence after defaults).
-	if v := os.Getenv("CC_SIDECAR_NATS_URL"); v != "" {
-		cfg.NATS.URL = v
-	}
-	if v := os.Getenv("CC_SIDECAR_NATS_TOKEN"); v != "" {
-		cfg.NATS.Token = v
-	}
-	if v := os.Getenv("CC_SIDECAR_WATCH_DIR"); v != "" {
-		cfg.WatchDir = v
-	}
-	if v := os.Getenv("CC_SIDECAR_IDLE_THRESHOLD"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			cfg.IdleThreshold = d
+	// Load config file if provided.
+	if path != "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logger.Warn("could not read config file, using defaults", "path", path, "error", err)
+		} else if err := yaml.Unmarshal(data, &cfg); err != nil {
+			logger.Warn("could not parse config file, using defaults", "path", path, "error", err)
 		}
 	}
 
-	if path == "" {
-		return cfg
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		logger.Warn("could not read config file, using defaults", "path", path, "error", err)
-		return cfg
-	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		logger.Warn("could not parse config file, using defaults", "path", path, "error", err)
-	}
-
-	// Re-apply env overrides (highest precedence).
+	// Env overrides (highest precedence).
 	if v := os.Getenv("CC_SIDECAR_NATS_URL"); v != "" {
 		cfg.NATS.URL = v
 	}
