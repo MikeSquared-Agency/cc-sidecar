@@ -1,0 +1,7 @@
+nats:
+  url: "nats://localhost:4222"
+  token: ""
+
+watch_dir: "~/.claude/projects/"
+idle_threshold: 10s
+poll_interval: 15s
