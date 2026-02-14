@@ -158,6 +158,42 @@ func TestIsUUIDLike(t *testing.T) {
 	}
 }
 
+func TestParseTranscript_ExitCodeZeroWithAssistant(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "aaaa1111-2222-3333-4444-555555555555.jsonl")
+
+	content := `{"type":"summary","sessionId":"aaaa1111-2222-3333-4444-555555555555","cwd":"/home/mike","timestamp":"2026-02-14T10:00:00Z"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Hello!"}]},"timestamp":"2026-02-14T10:01:00Z"}
+`
+	os.WriteFile(path, []byte(content), 0644)
+
+	result := parseTranscript(path, testLogger())
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.ExitCode != 0 {
+		t.Errorf("expected exit_code 0 for session with assistant response, got %d", result.ExitCode)
+	}
+}
+
+func TestParseTranscript_ExitCodeOneWithoutAssistant(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bbbb1111-2222-3333-4444-555555555555.jsonl")
+
+	content := `{"type":"summary","sessionId":"bbbb1111-2222-3333-4444-555555555555","cwd":"/home/mike","timestamp":"2026-02-14T10:00:00Z"}
+{"type":"user","message":{"role":"user","content":"hello"},"timestamp":"2026-02-14T10:01:00Z"}
+`
+	os.WriteFile(path, []byte(content), 0644)
+
+	result := parseTranscript(path, testLogger())
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.ExitCode != 1 {
+		t.Errorf("expected exit_code 1 for session without assistant response, got %d", result.ExitCode)
+	}
+}
+
 func TestParseTranscript_DeduplicatesFiles(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dedup-test-aaaa-bbbb-ccccddddeeee.jsonl")

@@ -95,11 +95,11 @@ func (t *Tracker) Stop() {
 }
 
 func (t *Tracker) check() {
+	// Collect paths to complete under the lock, then process outside it.
+	var readyPaths []string
+
 	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	now := time.Now()
-
 	for path, tf := range t.files {
 		if tf.reported {
 			continue
@@ -117,7 +117,13 @@ func (t *Tracker) check() {
 
 		t.logger.Info("session idle, no claude process — completing", "path", path, "idle", idle)
 		tf.reported = true
+		readyPaths = append(readyPaths, path)
+	}
+	t.mu.Unlock()
 
+	// Parse transcripts and invoke callbacks outside the lock to avoid
+	// blocking Touch() during network I/O (NATS publish, KV lookup).
+	for _, path := range readyPaths {
 		completed := parseTranscript(path, t.logger)
 		if completed != nil {
 			t.onComplete(completed)

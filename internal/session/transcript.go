@@ -49,11 +49,12 @@ func parseTranscript(path string, logger *slog.Logger) *CompletedSession {
 	defer f.Close()
 
 	var (
-		sessionID    string
-		workingDir   string
-		filesChanged = make(map[string]bool)
-		firstTS      time.Time
-		lastTS       time.Time
+		sessionID        string
+		workingDir       string
+		filesChanged     = make(map[string]bool)
+		firstTS          time.Time
+		lastTS           time.Time
+		hasAssistantMsg  bool
 	)
 
 	scanner := bufio.NewScanner(f)
@@ -90,6 +91,11 @@ func parseTranscript(path string, logger *slog.Logger) *CompletedSession {
 			}
 		}
 
+		// Track whether the session produced any assistant responses.
+		if entry.Type == "assistant" {
+			hasAssistantMsg = true
+		}
+
 		// Extract file changes from tool_use entries.
 		extractFileChanges(line, filesChanged)
 	}
@@ -118,13 +124,21 @@ func parseTranscript(path string, logger *slog.Logger) *CompletedSession {
 		durationMs = lastTS.Sub(firstTS).Milliseconds()
 	}
 
+	// Determine exit code heuristically. CC JSONL transcripts don't record
+	// explicit exit codes. A session with no assistant messages likely indicates
+	// a startup failure or crash.
+	exitCode := 0
+	if !hasAssistantMsg {
+		exitCode = 1
+	}
+
 	return &CompletedSession{
 		SessionID:      sessionID,
 		TranscriptPath: path,
 		FilesChanged:   files,
 		WorkingDir:     workingDir,
 		DurationMs:     durationMs,
-		ExitCode:       0,
+		ExitCode:       exitCode,
 	}
 }
 

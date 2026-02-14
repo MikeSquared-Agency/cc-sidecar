@@ -6,6 +6,7 @@ Requires=docker.service
 [Service]
 Type=simple
 User=mike
+EnvironmentFile=-/etc/cc-sidecar/env
 ExecStart=/home/mike/cc-sidecar/bin/cc-sidecar --config /etc/cc-sidecar/config.yaml
 Restart=on-failure
 RestartSec=5
