@@ -6,21 +6,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/MikeSquared-Agency/cc-sidecar/internal/session"
 	"github.com/fsnotify/fsnotify"
 )
+
+// Toucher is satisfied by session.Tracker — accepts file paths on write events.
+type Toucher interface {
+	Touch(path string)
+}
 
 // Watcher monitors ~/.claude/projects/ for JSONL transcript changes.
 type Watcher struct {
 	dir     string
-	tracker *session.Tracker
+	tracker Toucher
 	logger  *slog.Logger
 	fw      *fsnotify.Watcher
 	done    chan struct{}
 }
 
 // New creates a new transcript watcher.
-func New(dir string, tracker *session.Tracker, logger *slog.Logger) (*Watcher, error) {
+func New(dir string, tracker Toucher, logger *slog.Logger) (*Watcher, error) {
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
