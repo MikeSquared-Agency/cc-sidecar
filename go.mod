@@ -1,6 +1,6 @@
 module github.com/MikeSquared-Agency/cc-sidecar
 
-go 1.26
+go 1.24.0
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0
